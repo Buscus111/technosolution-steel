@@ -7,9 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
-  deploy:
+  # Job 1: Проверка кода (быстро)
+  test:
     runs-on: ubuntu-latest
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -23,11 +23,20 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Build application
+    - name: Build application (test)
       run: npm run build
       
+    - name: Run linting
+      run: npm run lint
+
+  # Job 2: Деплой (только если тесты прошли)
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
     - name: Deploy to server
-      if: github.ref == 'refs/heads/main'
       uses: appleboy/ssh-action@v1.2.0
       with:
         host: ${{ secrets.HOST }}
@@ -42,17 +51,20 @@ jobs:
           
           # Check if package.json changed to decide if we need npm ci
           if git diff --name-only HEAD~1 HEAD | grep -q "package"; then
-            echo "Package files changed, running npm ci..."
-            npm ci
+            echo "📦 Package files changed, running npm ci..."
+            time npm ci
           else
-            echo "No package changes, skipping npm ci..."
+            echo "⚡ No package changes, skipping npm ci..."
           fi
           
           # Build the application
-          npm run build
+          echo "🔨 Building application..."
+          time npm run build
           
-          # Restart the application (we'll use PM2)
+          # Restart the application
+          echo "🚀 Restarting application..."
           pm2 restart technosolution-steel || pm2 start npm --name "technosolution-steel" -- start
           
           # Show status
+          echo "✅ Deployment complete!"
           pm2 status
