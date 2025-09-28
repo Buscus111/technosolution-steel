@@ -40,8 +40,13 @@ jobs:
           # Pull latest changes
           git pull origin main
           
-          # Install dependencies
-          npm ci
+          # Check if package.json changed to decide if we need npm ci
+          if git diff --name-only HEAD~1 HEAD | grep -q "package"; then
+            echo "Package files changed, running npm ci..."
+            npm ci
+          else
+            echo "No package changes, skipping npm ci..."
+          fi
           
           # Build the application
           npm run build
